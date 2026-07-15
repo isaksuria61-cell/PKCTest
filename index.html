@@ -63,6 +63,49 @@
           <li class="toc-item" data-section="refleksi-pribadi"><a href="#refleksi-pribadi">7. Jurnal Refleksi</a></li>
         </ul>
       </nav>
+
+      <!-- Version Control System Widget -->
+      <section class="vcs-container" aria-label="Riwayat Suntingan Git">
+        <div class="vcs-header">
+          <div class="vcs-title-wrapper">
+            <h3 class="vcs-title">Version Control</h3>
+            <span class="vcs-branch-badge">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 0.15rem;">
+                <line x1="6" y1="3" x2="6" y2="15"/>
+                <circle cx="18" cy="6" r="3"/>
+                <circle cx="6" cy="18" r="3"/>
+                <path d="M18 9a9 9 0 0 1-9 9"/>
+              </svg>
+              main
+            </span>
+          </div>
+          <button class="vcs-refresh-btn" id="vcsRefreshBtn" aria-label="Muat ulang riwayat komit">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21.5 2v6h-6"/>
+              <path d="M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+            </svg>
+          </button>
+        </div>
+        <div class="vcs-list" id="vcsList">
+          <!-- Skeleton Loading -->
+          <div class="vcs-loading-pulse">
+            <div class="vcs-pulse-item">
+              <div class="vcs-pulse-circle"></div>
+              <div class="vcs-pulse-lines">
+                <div class="vcs-pulse-line"></div>
+                <div class="vcs-pulse-line short"></div>
+              </div>
+            </div>
+            <div class="vcs-pulse-item">
+              <div class="vcs-pulse-circle"></div>
+              <div class="vcs-pulse-lines">
+                <div class="vcs-pulse-line"></div>
+                <div class="vcs-pulse-line short"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </aside>
 
     <!-- Main Content Area -->
@@ -404,6 +447,136 @@
           saveStatus.classList.remove('show');
         }, 2500);
       }
+
+      // 5. Version Control System (GitHub Commits Fetcher)
+      const vcsList = document.getElementById('vcsList');
+      const vcsRefreshBtn = document.getElementById('vcsRefreshBtn');
+      const repoUrl = 'https://api.github.com/repos/isaksuria61-cell/PKCTest/commits?per_page=5';
+
+      function timeAgo(dateString) {
+        const date = new Date(dateString);
+        const now = new Date();
+        const seconds = Math.floor((now - date) / 1000);
+        
+        if (seconds < 0) return 'baru saja';
+        
+        const intervals = {
+          tahun: 31536000,
+          bulan: 2592000,
+          hari: 86400,
+          jam: 3600,
+          menit: 60
+        };
+
+        for (let unit in intervals) {
+          const value = Math.floor(seconds / intervals[unit]);
+          if (value >= 1) {
+            return `${value} ${unit} yang lalu`;
+          }
+        }
+        return 'baru saja';
+      }
+
+      const localCommitsFallback = [
+        {
+          sha: '87e484c',
+          html_url: 'https://github.com/isaksuria61-cell/PKCTest/commit/87e484c',
+          commit: {
+            message: 'feat: design theology reconciliation article and prepare version control',
+            author: {
+              name: 'Antigravity',
+              date: new Date().toISOString()
+            }
+          },
+          author: {
+            avatar_url: 'https://github.com/github.png',
+            login: 'antigravity-ai'
+          }
+        },
+        {
+          sha: '6fc1c66',
+          html_url: 'https://github.com/isaksuria61-cell/PKCTest/commit/6fc1c66',
+          commit: {
+            message: 'docs: initialize PKCTest Git Repository',
+            author: {
+              name: 'isaksuria61-cell',
+              date: new Date(Date.now() - 3600 * 1000 * 8).toISOString() // 8 hours ago
+            }
+          },
+          author: {
+            avatar_url: 'https://github.com/isaksuria61-cell.png',
+            login: 'isaksuria61-cell'
+          }
+        }
+      ];
+
+      async function loadCommits() {
+        vcsRefreshBtn.classList.add('spinning');
+        
+        try {
+          const response = await fetch(repoUrl);
+          if (!response.ok) {
+            throw new Error('Gagal mengambil data dari GitHub');
+          }
+          const commits = await response.json();
+          renderCommits(commits);
+        } catch (error) {
+          console.warn('Menggunakan fallback lokal:', error.message);
+          renderCommits(localCommitsFallback, true);
+        } finally {
+          vcsRefreshBtn.classList.remove('spinning');
+        }
+      }
+
+      function renderCommits(commits, isFallback = false) {
+        if (!commits || commits.length === 0) {
+          vcsList.innerHTML = `<div class="vcs-status-message">Tidak ada riwayat suntingan.</div>`;
+          return;
+        }
+
+        let html = '';
+        if (isFallback) {
+          html += `<div style="font-size: 0.75rem; color: var(--accent-gold); margin-bottom: 0.5rem; text-align: center;">ℹ️ Menampilkan data lokal (offline)</div>`;
+        }
+
+        commits.forEach(item => {
+          const shaShort = item.sha.substring(0, 7);
+          const message = item.commit.message.split('\n')[0]; // only get first line
+          const authorName = item.author ? item.author.login : item.commit.author.name;
+          const avatarUrl = item.author ? item.author.avatar_url : 'https://github.com/github.png';
+          const commitDate = timeAgo(item.commit.author.date);
+
+          html += `
+            <div class="vcs-item">
+              <img src="${avatarUrl}" alt="${authorName}" class="vcs-author-avatar" onerror="this.src='https://github.com/github.png'">
+              <div class="vcs-content">
+                <div class="vcs-commit-msg">${escapeHtml(message)}</div>
+                <div class="vcs-commit-meta">
+                  <span class="vcs-author-name">@${escapeHtml(authorName)}</span>
+                  <span>${commitDate}</span>
+                  <a href="${item.html_url}" target="_blank" class="vcs-commit-hash" title="Lihat di GitHub">${shaShort}</a>
+                </div>
+              </div>
+            </div>
+          `;
+        });
+
+        vcsList.innerHTML = html;
+      }
+
+      function escapeHtml(str) {
+        return str
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      vcsRefreshBtn.addEventListener('click', loadCommits);
+      
+      // Initial Load
+      loadCommits();
     });
   </script>
 </body>
